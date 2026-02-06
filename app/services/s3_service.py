@@ -19,12 +19,16 @@ s3 = boto3.client(
     region_name=AWS_REGION,
 )
 
-def upload_to_s3(file_path, original_name):
+def upload_to_s3(file_path, original_name, delete_after=False):
     ext = os.path.splitext(original_name)[1]
     key = f"resumes/{uuid4()}{ext}"
 
-    s3.upload_file(file_path, BUCKET_NAME, key)
-    return key
+    try:
+        s3.upload_file(file_path, BUCKET_NAME, key)
+        return key
+    finally:
+        if delete_after and os.path.exists(file_path):
+            os.remove(file_path)
 
 def list_resumes():
     res = s3.list_objects_v2(Bucket=BUCKET_NAME, Prefix="resumes/")

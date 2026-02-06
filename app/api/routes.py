@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File
+from fastapi import APIRouter, UploadFile, File, BackgroundTasks
 from pydantic import BaseModel
 from app.services.resume_parser import parse_resume_file
 from app.services.recommender import recommend_jobs
@@ -15,7 +15,7 @@ class DeleteRequest(BaseModel):
     
 
 @router.post("/recommend")
-async def recommend(file: UploadFile = File(...)):
+async def recommend(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
     
     suffix = os.path.splitext(file.filename)[1]
 
@@ -24,20 +24,21 @@ async def recommend(file: UploadFile = File(...)):
         tmp_path = tmp.name
 
     try:
-        s3_key = upload_to_s3(tmp_path, file.filename)
+        # Move S3 upload to background and delete file after
+        background_tasks.add_task(upload_to_s3, tmp_path, file.filename, delete_after=True)
+        
         resume_text = parse_resume_file(file)
         results = recommend_jobs(resume_text)
 
-        
-
         return {
         "filename": file.filename,
-        "s3_key": s3_key,
         "no. of recommendations": len(results),
         "recommendations": results
         }
     finally:
-        os.remove(tmp_path)
+        # We can't delete the file immediately because background task needs it
+        # The background task should ideally handle deletion
+        pass
         
 @router.get("/resumes")
 def get_all_resumes():

@@ -3,23 +3,15 @@ import phonenumbers
 from app.utils.file_reader import read_resume_from_upload
 from app.services.skill_matcher import nlp, matcher
 
-def extract_skills(text):
-    text_lower = text.lower()
-    skill_section = text_lower
-
-    if "skills" in text_lower:
-        skill_section = text_lower.split("skills", 1)[1][:1500]
-
-    doc = nlp(skill_section)
+def extract_skills_from_doc(doc):
+    # We now receive a doc instead of text
     matches = matcher(doc)
-
     skills = set()
     for _, start, end in matches:
         skill = doc[start:end].text.lower().strip()
         skill = re.sub(r"[^a-zA-Z0-9+.# ]", "", skill)
         if len(skill) > 1:
             skills.add(skill)
-
     return sorted(skills)
 
 
@@ -38,24 +30,23 @@ def extract_experience_years(text):
 
     return max(years) if years else None
 
-
-def extract_education(text):
+def extract_education_from_doc(doc):
     degrees = ["bachelor","b.tech","be","b.sc","master","m.tech","mba","phd","diploma"]
     results = []
-
-    for sent in nlp(text).sents:
+    for sent in doc.sents:
         s = sent.text.lower()
         if any(deg in s for deg in degrees):
             results.append(sent.text.strip())
-
     return results
 
-
-def extract_projects(text):
+def extract_projects_from_doc(doc):
     projects = []
-    if "project" in text.lower():
-        section = text.lower().split("project", 1)[1][:2000]
-        for sent in nlp(section).sents:
+    text_lower = doc.text.lower()
+    if "project" in text_lower:
+        # Fallback to text for slicing but could be optimized further
+        section = text_lower.split("project", 1)[1][:2000]
+        temp_doc = nlp(section)
+        for sent in temp_doc.sents:
             if len(sent.text.strip()) > 20:
                 projects.append(sent.text.strip())
     return projects[:5]
@@ -71,23 +62,23 @@ def extract_phone(text):
         return phonenumbers.format_number(match.number, phonenumbers.PhoneNumberFormat.E164)
     return None
 
-def extract_name(text):
-    doc = nlp(text[:300])
-    for ent in doc.ents:
+def extract_name_from_doc(doc):
+    # Use the first 300 tokens of the already processed doc
+    for ent in doc[:100].ents:
         if ent.label_ == "PERSON":
             return ent.text
-        return None
-
+    return None
 
 def parse_resume(text):
+    doc = nlp(text)
     return {
-    "name": extract_name(text),
-    "skills": extract_skills(text),
-    "experience_years": extract_experience_years(text),
-    "education": extract_education(text),
-    "projects": extract_projects(text),
-    "email": extract_email(text),
-    "phone": extract_phone(text)
+        "name": extract_name_from_doc(doc),
+        "skills": extract_skills_from_doc(doc),
+        "experience_years": extract_experience_years(text),
+        "education": extract_education_from_doc(doc),
+        "projects": extract_projects_from_doc(doc),
+        "email": extract_email(text),
+        "phone": extract_phone(text)
     }
 
 

@@ -6,6 +6,7 @@
 import os
 import re
 import numpy as np
+import torch
 from datetime import datetime, timezone
 from sentence_transformers import SentenceTransformer
 
@@ -40,6 +41,9 @@ def get_model():
             MODEL_NAME,
             cache_folder=CACHE_DIR
         )
+        # Performance optimization for CPU
+        if not torch.cuda.is_available():
+            torch.set_num_threads(4) 
     return _model
 
 
