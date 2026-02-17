@@ -18,19 +18,18 @@ dotenv.load_dotenv(ENV_PATH)
 
 import numpy as np
 import faiss
-import boto3
 from pymongo import MongoClient
 from app.services.recommender import get_model
 from app.core.config import DATA_DIR
+from app.services.drive_service import (
+    download_index_from_drive,
+    upload_index_to_drive
+)
 
 # ---------------- CONFIG ----------------
 MONGO_URI = os.getenv("MONGO_URI")
 DB_NAME = "job_recommendation"
 COLLECTION = "jobs"
-
-BUCKET = os.getenv("AWS_BUCKET_NAME")
-AWS_REGION = os.getenv("AWS_REGION", "ap-south-1")
-S3_KEY = "faiss/jobs.index"
 LOCAL_INDEX = f"{DATA_DIR}/jobs.index"
 
 # ----------------------------------------
@@ -51,10 +50,9 @@ Job Description: {job.get('Job Description', '')}
 # ---------- S3 helpers ----------
 
 def download_existing_index():
-    s3 = boto3.client("s3", region_name=AWS_REGION)
     try:
         os.makedirs(DATA_DIR, exist_ok=True)
-        s3.download_file(BUCKET, S3_KEY, LOCAL_INDEX)
+        download_index_from_drive(LOCAL_INDEX)
         print("📥 Existing index downloaded")
         return faiss.read_index(LOCAL_INDEX)
     except Exception:
@@ -63,9 +61,8 @@ def download_existing_index():
 
 
 def upload_index():
-    s3 = boto3.client("s3", region_name=AWS_REGION)
-    s3.upload_file(LOCAL_INDEX, BUCKET, S3_KEY)
-    print("☁ Updated index uploaded to S3")
+    upload_index_to_drive(LOCAL_INDEX)
+    print("☁ Updated index uploaded to Drive")
 
 
 # ---------- Main logic ----------

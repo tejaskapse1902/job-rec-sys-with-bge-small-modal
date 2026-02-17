@@ -23,3 +23,13 @@ phonenumbers
 pandas
 python-multipart
 gunicorn
+python-jose[cryptography]
+# bcrypt==4.0.1
+# passlib[bcrypt]==1.0.4
+email-validator
+
+# ✅ Google Drive (NEW)
+google-api-python-client
+google-auth
+google-auth-httplib2
+google-auth-oauthlib

@@ -1,17 +1,14 @@
 import boto3
 import os
 import dotenv
+from app.services.drive_service import download_index_from_drive
+from app.core.config import DATA_DIR
 
 dotenv.load_dotenv()
 
-BUCKET_NAME = os.getenv("AWS_BUCKET_NAME")
-AWS_REGION = os.getenv("AWS_REGION", "ap-south-1")
+LOCAL_PATH = f"{DATA_DIR}/jobs.index"
 
-S3_KEY = "faiss/jobs.index"
-LOCAL_PATH = "data/jobs.index"
-
-
-def download_index_from_s3(force_update=True):
+def download_index(force_update=True):
     os.makedirs("data", exist_ok=True)
 
     if os.path.exists(LOCAL_PATH):
@@ -21,9 +18,8 @@ def download_index_from_s3(force_update=True):
         else:
             raise FileExistsError("FAISS index already exists locally")
 
-    print("⬇️ Downloading FAISS index from S3...")
+    print("⬇️ Downloading FAISS index from Drive...")
 
-    s3 = boto3.client("s3", region_name=AWS_REGION)
-    s3.download_file(BUCKET_NAME, S3_KEY, LOCAL_PATH)
+    download_index_from_drive(LOCAL_PATH, force_update=True)
 
     print("✅ FAISS index downloaded and updated")

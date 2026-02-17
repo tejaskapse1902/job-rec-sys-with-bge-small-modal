@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from app.api.routes import router
+from app.api.auth_routes import router as auth_router
 from app.services.index_manager import initialize_index, start_auto_refresh
 
 
@@ -36,6 +37,7 @@ app.add_middleware(
 )
 
 app.include_router(router)
+app.include_router(auth_router)
 
 @app.get("/health")
 def health():

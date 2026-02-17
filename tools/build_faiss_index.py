@@ -2,29 +2,25 @@
 # app/services/build_faiss_index.py
 # HNSW + accuracy-safe + S3 upload
 # =============================
-
+# ---------------- Path & env setup ----------------
 import sys
 import os
 import dotenv
+import pandas as pd
 
-# ---------------- Path & env setup ----------------
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, PROJECT_ROOT)
 
 ENV_PATH = os.path.join(PROJECT_ROOT, "app", ".env")
 dotenv.load_dotenv(ENV_PATH)
 
-# os.environ["HF_HOME"] = "/tmp/hf_cache"
-# os.environ["TRANSFORMERS_CACHE"] = "/tmp/hf_cache"
-
 # ---------------- Imports ----------------
 import numpy as np
-import pandas as pd
 import faiss
-import boto3
 from pymongo import MongoClient
-from app.services.recommender import get_model
+from app.services.drive_service import upload_index_to_drive
 from app.core.config import DATA_DIR
+from app.services.recommender import get_model
 
 # ---------------- Config ----------------
 MONGO_URI = os.getenv("MONGO_URI")
@@ -32,11 +28,6 @@ DB_NAME = "job_recommendation"
 COLLECTION_NAME = "jobs"
 
 OUTPUT_INDEX_PATH = f"{DATA_DIR}/jobs.index"
-
-AWS_BUCKET_NAME = os.getenv("AWS_BUCKET_NAME")
-AWS_REGION = os.getenv("AWS_REGION", "ap-south-1")
-S3_KEY = "faiss/jobs.index"
-
 # ------------------------------------------------
 
 
@@ -50,20 +41,6 @@ Requirements: {row.get('Requirements', '')}
 Responsibilities: {row.get('Responsibilities', '')}
 Job Description: {row.get('Job Description', '')}
 """
-
-
-def upload_to_s3(local_path: str):
-    print("☁ Uploading index to S3...")
-
-    if not os.path.exists(local_path):
-        raise FileNotFoundError("jobs.index not found for upload")
-
-    s3 = boto3.client("s3", region_name=AWS_REGION)
-
-    s3.upload_file(local_path, AWS_BUCKET_NAME, S3_KEY)
-
-    print("✅ jobs.index uploaded to S3 successfully")
-
 
 
 def build_faiss_index():
@@ -118,7 +95,7 @@ def build_faiss_index():
 def main():
     try:
         index_path = build_faiss_index()
-        upload_to_s3(index_path)
+        upload_index_to_drive(index_path)
         print("🎉 Build + Upload pipeline completed successfully")
 
     except Exception as e:

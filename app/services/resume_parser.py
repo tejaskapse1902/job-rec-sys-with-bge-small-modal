@@ -88,5 +88,5 @@ def clean_text(text):
     return text.strip()
 
 def parse_resume_file(file):
-    raw = read_resume_from_upload(file)
+    raw = read_resume_from_upload(file) # supports UploadFile or str path
     return clean_text(raw)

@@ -2,11 +2,14 @@ import os
 import time
 import threading
 import faiss
-import boto3
 import pandas as pd
 from pymongo import MongoClient
 from app.core.config import DATA_DIR
 import dotenv
+from app.services.drive_service import (
+    download_index_from_drive,
+    get_drive_last_modified
+)
 
 dotenv.load_dotenv()
 # Load environment variables with fallback
@@ -15,8 +18,6 @@ if not dotenv.load_dotenv():
 
 
 # ---------------- CONFIG ----------------
-BUCKET = os.getenv("AWS_BUCKET_NAME")
-S3_KEY = "faiss/jobs.index"
 LOCAL_INDEX = f"{DATA_DIR}/jobs.index"
 
 # Add a check to fail gracefully or log clearly
@@ -27,7 +28,7 @@ DB_NAME = "job_recommendation"
 COLLECTION = "jobs"
 # ----------------------------------------
 
-_s3 = boto3.client("s3")
+
 
 _index = None
 _jobs_df = None
@@ -38,7 +39,7 @@ _lock = threading.Lock()
 # ---------------- Internal helpers ----------------
 
 def download_index():
-    _s3.download_file(BUCKET, S3_KEY, LOCAL_INDEX)
+    download_index_from_drive(LOCAL_INDEX, force_update=True)
 
 
 def load_index_from_disk():
@@ -53,11 +54,6 @@ def load_jobs_from_mongodb():
     return pd.DataFrame(jobs)
 
 
-def get_s3_last_modified():
-    meta = _s3.head_object(Bucket=BUCKET, Key=S3_KEY)
-    return meta["LastModified"]
-
-
 # ---------------- Public API ----------------
 
 def initialize_index():
@@ -69,7 +65,7 @@ def initialize_index():
     load_index_from_disk()
 
     _jobs_df = load_jobs_from_mongodb()
-    _last_modified = get_s3_last_modified()
+    _last_modified = get_drive_last_modified()
 
     print("✅ FAISS index + jobs loaded")
     print(f"   - Jobs indexed: {_jobs_df.shape[0]}")
@@ -95,7 +91,7 @@ def reload_index_and_jobs():
         load_index_from_disk()
 
         _jobs_df = load_jobs_from_mongodb()
-        _last_modified = get_s3_last_modified()
+        _last_modified = get_drive_last_modified()
 
         print("✅ Reload complete")
         print(f"   - Jobs indexed: {_jobs_df.shape[0]}")
@@ -105,9 +101,9 @@ def check_and_reload():
     global _last_modified
 
     try:
-        s3_time = get_s3_last_modified()
+        drive_time = get_drive_last_modified()
 
-        if _last_modified is None or s3_time > _last_modified:
+        if _last_modified is None or drive_time > _last_modified:
             reload_index_and_jobs()
 
     except Exception as e:
