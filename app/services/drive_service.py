@@ -2,17 +2,15 @@ import os
 import io
 import json
 import mimetypes
+import time
 from uuid import uuid4
 from datetime import datetime, timezone
 from pathlib import Path
-import time
 from io import BytesIO
-from googleapiclient.http import MediaIoBaseUpload
-
 
 import dotenv
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
+from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -24,14 +22,7 @@ dotenv.load_dotenv("app/.env")
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 BASE_DIR = Path(__file__).resolve().parents[2]  # backend/
-
 AUTH_MODE = os.getenv("GDRIVE_AUTH_MODE", "oauth").lower()
-
-OAUTH_CLIENT_FILE = os.getenv("GDRIVE_OAUTH_CLIENT_FILE", "app/keys/gdrive_oauth_client.json")
-OAUTH_TOKEN_FILE = os.getenv("GDRIVE_OAUTH_TOKEN_FILE", "app/keys/gdrive_token.json")
-
-# For deployment (recommended): store token json in env
-OAUTH_TOKEN_JSON_ENV = os.getenv("GDRIVE_OAUTH_TOKEN_JSON", "")
 
 RESUMES_FOLDER_ID = os.getenv("GDRIVE_RESUMES_FOLDER_ID", "")
 INDEX_FOLDER_ID = os.getenv("GDRIVE_INDEX_FOLDER_ID", "")
@@ -42,28 +33,42 @@ def _abs_path(rel: str) -> str:
     return str((BASE_DIR / rel).resolve())
 
 
-def _guess_mime(path: str) -> str:
-    mt, _ = mimetypes.guess_type(path)
+def _guess_mime(name_or_path: str) -> str:
+    mt, _ = mimetypes.guess_type(name_or_path)
     return mt or "application/octet-stream"
+
+
+def _safe_delete(path: str, tries: int = 8, delay: float = 0.4):
+    for _ in range(tries):
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+            return
+        except PermissionError:
+            time.sleep(delay)
+    if os.path.exists(path):
+        os.remove(path)
 
 
 def _load_oauth_creds() -> Credentials:
     """
     Loads OAuth credentials from:
     1) env var GDRIVE_OAUTH_TOKEN_JSON (deployment)
-    2) token file (local)
-    Refreshes if expired and saves back (env cannot be written, file can).
+    2) token file path GDRIVE_OAUTH_TOKEN_FILE (local)
     """
-    # 1) Deployment: token json in env
-    if OAUTH_TOKEN_JSON_ENV.strip():
-        info = json.loads(OAUTH_TOKEN_JSON_ENV)
+    token_json = os.getenv("GDRIVE_OAUTH_TOKEN_JSON", "").strip()
+    token_file = os.getenv("GDRIVE_OAUTH_TOKEN_FILE", "app/keys/gdrive_token.json")
+
+    # ✅ Deployment: token JSON in env
+    if token_json:
+        info = json.loads(token_json)
         creds = Credentials.from_authorized_user_info(info, SCOPES)
         if creds.expired and creds.refresh_token:
             creds.refresh(Request())
         return creds
 
-    # 2) Local: token file
-    token_path = Path(_abs_path(OAUTH_TOKEN_FILE))
+    # ✅ Local: token file
+    token_path = Path(_abs_path(token_file))
     if not token_path.exists():
         raise FileNotFoundError(
             f"OAuth token not found: {token_path}. "
@@ -74,8 +79,10 @@ def _load_oauth_creds() -> Credentials:
 
     if creds.expired and creds.refresh_token:
         creds.refresh(Request())
-        # Save refreshed token locally
-        token_path.write_text(creds.to_json(), encoding="utf-8")
+        try:
+            token_path.write_text(creds.to_json(), encoding="utf-8")
+        except Exception:
+            pass
 
     return creds
 
@@ -106,7 +113,7 @@ def upload_to_drive(file_path: str, original_name: str, delete_after: bool = Fal
     ext = os.path.splitext(original_name)[1] or ""
     drive_name = f"{uuid4()}{ext}"
 
-    # ✅ Read file into memory first (releases file lock)
+    # ✅ Read file into memory first (avoids Windows file lock issues)
     with open(file_path, "rb") as f:
         data = f.read()
 
@@ -124,12 +131,10 @@ def upload_to_drive(file_path: str, original_name: str, delete_after: bool = Fal
         fields="id"
     ).execute()
 
-    # ✅ Now deletion is safe (file not used by Drive client anymore)
     if delete_after:
         _safe_delete(file_path)
 
     return created["id"]
-
 
 
 def list_resumes() -> list:
@@ -141,6 +146,7 @@ def list_resumes() -> list:
 
     results = []
     page_token = None
+
     while True:
         resp = service.files().list(
             q=q,
@@ -216,10 +222,18 @@ def upload_index_to_drive(local_path: str):
     if not os.path.exists(local_path):
         raise FileNotFoundError(f"Index file not found: {local_path}")
 
+    # ✅ Read file into memory to avoid lock issues
+    with open(local_path, "rb") as f:
+        data = f.read()
+
     service = _drive()
     existing = _find_file_by_name(INDEX_FOLDER_ID, INDEX_FILENAME)
 
-    media = MediaFileUpload(local_path, mimetype="application/octet-stream", resumable=True)
+    media = MediaIoBaseUpload(
+        BytesIO(data),
+        mimetype="application/octet-stream",
+        resumable=True
+    )
 
     if existing:
         service.files().update(
@@ -231,16 +245,3 @@ def upload_index_to_drive(local_path: str):
             body={"name": INDEX_FILENAME, "parents": [INDEX_FOLDER_ID]},
             media_body=media
         ).execute()
-
-def _safe_delete(path: str, tries: int = 8, delay: float = 0.4):
-    for _ in range(tries):
-        try:
-            if os.path.exists(path):
-                os.remove(path)
-            return
-        except PermissionError:
-            time.sleep(delay)
-    # final attempt
-    if os.path.exists(path):
-        os.remove(path)
-
