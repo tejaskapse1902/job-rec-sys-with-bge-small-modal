@@ -26,7 +26,8 @@ def main():
 
     # Add system fields
     df["created_date"] = datetime.utcnow()
-    df["indexed"] = False   
+    df["indexed"] = False
+    df["is_active"] = True
 
     # Convert to dict
     records = df.to_dict(orient="records")

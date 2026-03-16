@@ -50,7 +50,12 @@ def load_index_from_disk():
 def load_jobs_from_mongodb():
     client = MongoClient(MONGO_URI)
     col = client[DB_NAME][COLLECTION]
-    jobs = list(col.find({}, {"_id": 0}))
+    # Backfill missing active flags for legacy rows.
+    col.update_many(
+        {"is_active": {"$exists": False}},
+        {"$set": {"is_active": True}}
+    )
+    jobs = list(col.find({"is_active": {"$ne": False}}))
     return pd.DataFrame(jobs)
 
 
