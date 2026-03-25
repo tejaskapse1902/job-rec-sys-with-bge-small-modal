@@ -1,30 +1,25 @@
 # Backend README
 
-## Overview
+This backend is a FastAPI service for authentication, job management, resume-based recommendations, applications, reporting, external job import, and Google Drive integration.
 
-This is the FastAPI backend for the Job Recommendation System.
+## Purpose
 
-It handles:
+The backend is responsible for:
 
-- authentication and authorization
-- employer approval
-- job CRUD
-- profile APIs
-- resume upload
-- Google Drive storage
-- resume parsing
-- recommendation generation
-- applications
-- not-apply reason tracking
-- admin reports
-- external job import
-- FAISS index initialization and reload
+- user signup, login, profile lookup, and password reset
+- employer approval workflow
+- job CRUD with role-based access
+- resume upload and parsing
+- recommendation generation and persistence
+- application submission and history
+- admin and employer reports
+- external job search/import
+- FAISS index lifecycle management
 
-## Stack
+## Tech Stack
 
 - FastAPI
-- Uvicorn
-- Gunicorn
+- Uvicorn / Gunicorn
 - MongoDB + PyMongo
 - Sentence Transformers
 - FAISS
@@ -32,127 +27,31 @@ It handles:
 - Google Drive API
 - SMTP email
 
-## Project Structure
+## Entry Points
+
+- `app/main.py`: FastAPI app setup, router registration, startup lifecycle
+- `run.py`: local convenience launcher
+- `Dockerfile`: production container entrypoint
+
+## Folder Map
 
 ```text
 backend/
 |-- app/
-|   |-- api/
-|   |-- core/
-|   |-- models/
-|   |-- services/
-|   |-- utils/
-|   `-- main.py
-|-- data/
-|-- tools/
-|-- app/.env
-|-- Dockerfile
+|   |-- api/          # FastAPI routers
+|   |-- core/         # auth, database, config, collection alias
+|   |-- models/       # request/response schemas
+|   |-- services/     # domain logic
+|   `-- utils/        # file parsing helpers
+|-- data/             # skills list, import CSV/XLSX, jobs.index
+|-- tools/            # manual setup / maintenance scripts
 |-- requirements.txt
-|-- run.py
+|-- requirements.lock.txt
+|-- Dockerfile
 `-- README.md
 ```
 
-## Requirements
-
-- Python 3.10+
-- MongoDB
-- Google Drive API credentials
-- spaCy English model
-
-## Install
-
-From the `backend/` directory:
-
-```powershell
-python -m venv venv
-venv\Scripts\activate
-pip install --upgrade pip
-pip install -r requirements.txt
-python -m spacy download en_core_web_sm
-```
-
-## Environment
-
-Create `backend/app/.env`.
-
-Example:
-
-```env
-MONGO_URI=mongodb://localhost:27017/job_recommendation
-SECRET_KEY=change-this-secret
-RESET_OTP_EXPIRE_MINUTES=10
-
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USERNAME=your-email@example.com
-SMTP_PASSWORD=your-app-password
-SMTP_USE_TLS=true
-SMTP_FROM_EMAIL=your-email@example.com
-SMTP_FROM_NAME=JobMatch
-
-GDRIVE_AUTH_MODE=oauth
-GDRIVE_RESUMES_FOLDER_ID=your-google-drive-folder-id
-GDRIVE_INDEX_FOLDER_ID=your-google-drive-index-folder-id
-GDRIVE_INDEX_FILENAME=jobs.index
-GDRIVE_OAUTH_TOKEN_FILE=app/keys/gdrive_token.json
-GDRIVE_OAUTH_TOKEN_JSON=
-
-HF_CACHE_DIR=
-
-ENABLE_ARBEITNOW_IMPORT=true
-```
-
-Important config sources:
-
-- MongoDB: [database.py](d:/Clg Notes/MCA/4th Semester/job-rec-sys (production)/backend/app/core/database.py:7)
-- JWT auth: [auth.py](d:/Clg Notes/MCA/4th Semester/job-rec-sys (production)/backend/app/core/auth.py:13)
-- OTP expiry: [auth_routes.py](d:/Clg Notes/MCA/4th Semester/job-rec-sys (production)/backend/app/api/auth_routes.py:21)
-- SMTP mail: [email_service.py](d:/Clg Notes/MCA/4th Semester/job-rec-sys (production)/backend/app/services/email_service.py:6)
-- Google Drive: [drive_service.py](d:/Clg Notes/MCA/4th Semester/job-rec-sys (production)/backend/app/services/drive_service.py:19)
-
-## Run Locally
-
-Option 1:
-
-```powershell
-uvicorn app.main:app --reload
-```
-
-Option 2:
-
-```powershell
-python run.py
-```
-
-Default local API URL:
-
-```text
-http://127.0.0.1:8000
-```
-
-Health check:
-
-```text
-GET /health
-```
-
-## Docker
-
-Build:
-
-```powershell
-docker build -t job-rec-backend .
-```
-
-Run:
-
-```powershell
-docker run -p 8000:8000 --env-file app/.env job-rec-backend
-```
-
-Docker entrypoint is defined in [Dockerfile](d:/Clg Notes/MCA/4th Semester/job-rec-sys (production)/backend/Dockerfile:1).
-
-## API Modules
+## Main Routers
 
 ### Authentication
 
@@ -162,18 +61,14 @@ Docker entrypoint is defined in [Dockerfile](d:/Clg Notes/MCA/4th Semester/job-r
 - `POST /auth/forgot-password`
 - `POST /auth/reset-password`
 
-File:
+File: `app/api/auth_routes.py`
 
-- [auth_routes.py](d:/Clg Notes/MCA/4th Semester/job-rec-sys (production)/backend/app/api/auth_routes.py:1)
-
-### Users
+### User Profile
 
 - `GET /users/profile`
 - `PATCH /users/profile`
 
-File:
-
-- [user_routes.py](d:/Clg Notes/MCA/4th Semester/job-rec-sys (production)/backend/app/api/user_routes.py:1)
+File: `app/api/user_routes.py`
 
 ### Jobs
 
@@ -183,41 +78,38 @@ File:
 - `PUT /jobs/{job_id}`
 - `DELETE /jobs/{job_id}`
 
-File:
+File: `app/api/jobs_routes.py`
 
-- [jobs_routes.py](d:/Clg Notes/MCA/4th Semester/job-rec-sys (production)/backend/app/api/jobs_routes.py:1)
+### Resume + Recommendation Session Creation
+
+- `POST /recommend`
+- `GET /resumes`
+- `DELETE /resumes`
+- `POST /admin/reload-index`
+
+File: `app/api/routes.py`
+
+### Recommendation History
+
+- `GET /recommendations/latest`
+- `POST /recommendations/{item_id}/not-apply-reason`
+
+File: `app/api/recommendations_routes.py`
 
 ### Applications
 
 - `POST /applications`
 - `GET /applications/my-applications`
 
-File:
+File: `app/api/applications_routes.py`
 
-- [applications_routes.py](d:/Clg Notes/MCA/4th Semester/job-rec-sys (production)/backend/app/api/applications_routes.py:1)
-
-### Recommendations
-
-- `POST /recommend`
-- `GET /recommendations/latest`
-- `POST /recommendations/{item_id}/not-apply-reason`
-
-Files:
-
-- [routes.py](d:/Clg Notes/MCA/4th Semester/job-rec-sys (production)/backend/app/api/routes.py:27)
-- [recommendations_routes.py](d:/Clg Notes/MCA/4th Semester/job-rec-sys (production)/backend/app/api/recommendations_routes.py:1)
-
-### Admin
+### Admin Employer Approval
 
 - `GET /admin/employers/pending`
 - `PATCH /admin/employers/{user_id}/approve`
 - `PATCH /admin/employers/{user_id}/reject`
-- `POST /admin/reload-index`
 
-Files:
-
-- [admin_routes.py](d:/Clg Notes/MCA/4th Semester/job-rec-sys (production)/backend/app/api/admin_routes.py:1)
-- [routes.py](d:/Clg Notes/MCA/4th Semester/job-rec-sys (production)/backend/app/api/routes.py:113)
+File: `app/api/admin_routes.py`
 
 ### Reports
 
@@ -225,149 +117,132 @@ Files:
 - `GET /admin/reports/candidates`
 - `GET /admin/reports/employers`
 - `GET /admin/reports/not-apply-reasons`
+- `GET /employer/reports/overview`
+- `GET /employer/reports/jobs`
+- `GET /employer/reports/jobs/{job_id}/applicants`
+- `GET /employer/reports/applications/{application_id}/resume`
 
-File:
+File: `app/api/reports_routes.py`
 
-- [reports_routes.py](d:/Clg Notes/MCA/4th Semester/job-rec-sys (production)/backend/app/api/reports_routes.py:1)
-
-### External Import
+### External Jobs
 
 - `POST /admin/jobs/import/search`
 - `POST /admin/jobs/import`
 
-File:
+File: `app/api/external_jobs_routes.py`
 
-- [external_jobs_routes.py](d:/Clg Notes/MCA/4th Semester/job-rec-sys (production)/backend/app/api/external_jobs_routes.py:1)
+## Core Domain Rules
 
-## Auth Rules
+### Roles
 
-- public signup allows `job_seeker` and `employer`
-- public admin signup is blocked
-- employer signup creates `status: pending`
-- only approved employers can post jobs
-- admin can manage all jobs
-- job seeker can apply to jobs
+- `admin`
+- `employer`
+- `job_seeker`
 
-## Job Model Notes
+### Employer Approval
 
-The backend supports your MongoDB job schema, including fields such as:
+- employer signup is allowed
+- new employer accounts are created with `status: pending`
+- pending employers cannot manage jobs until approved
 
-- `Job Title`
-- `Job Type`
-- `Location`
-- `Experience Level`
-- `Salary Min (?)`
-- `Salary Max (?)`
-- `Min Education`
-- `Category`
-- `Openings`
-- `Notice Period`
-- `Year of Passing`
-- `Direct Link`
-- `Work Type`
-- `Interview Type`
-- `Company Name`
-- `Company Website`
-- `Company Description`
-- `Job Description`
-- `Requirements`
-- `Responsibilities`
-- `Skills`
-- `created_date`
-- `indexed`
-- `is_active`
+### Job Management
 
-Normalization logic lives in [jobs_routes.py](d:/Clg Notes/MCA/4th Semester/job-rec-sys (production)/backend/app/api/jobs_routes.py:104).
+- admins can manage all jobs
+- active employers can manage only their own jobs
+- deletes are soft deletes using `is_active = false`
 
-## Recommendation Flow
+### Recommendations
 
-1. user uploads resume to `POST /recommend`
-2. backend parses the resume
-3. resume is uploaded to Google Drive
-4. recommendation engine loads FAISS index and Mongo job data
-5. matching jobs are returned
-6. recommendation session and recommendation items are stored in MongoDB
+- only active jobs are loaded into the recommendation dataset
+- new/imported jobs start with `indexed = false`
+- those jobs affect recommendations only after index refresh
 
-Relevant files:
+## Environment Variables
 
-- [routes.py](d:/Clg Notes/MCA/4th Semester/job-rec-sys (production)/backend/app/api/routes.py:27)
-- [resume_parser.py](d:/Clg Notes/MCA/4th Semester/job-rec-sys (production)/backend/app/services/resume_parser.py:1)
-- [recommender.py](d:/Clg Notes/MCA/4th Semester/job-rec-sys (production)/backend/app/services/recommender.py:1)
+Use `backend/app/.env`. A template is available at [app/.env.example](app/.env.example).
 
-## Indexing Workflow
+### Required / Primary
 
-### Startup
+- `MONGO_URI`
+- `SECRET_KEY`
+- `GDRIVE_RESUMES_FOLDER_ID`
+- `GDRIVE_INDEX_FOLDER_ID`
 
-On app startup:
+### Password Reset Email
 
-- backend tries to load the FAISS index from Google Drive
-- active jobs are loaded from MongoDB
-- background refresh starts
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_USERNAME`
+- `SMTP_PASSWORD`
+- `SMTP_USE_TLS`
+- `SMTP_FROM_EMAIL`
+- `SMTP_FROM_NAME`
+- `RESET_OTP_EXPIRE_MINUTES`
 
-This is handled in [main.py](d:/Clg Notes/MCA/4th Semester/job-rec-sys (production)/backend/app/main.py:14) and [index_manager.py](d:/Clg Notes/MCA/4th Semester/job-rec-sys (production)/backend/app/services/index_manager.py:67).
+### Google Drive
 
-### Admin reload
+- `GDRIVE_AUTH_MODE`
+- `GDRIVE_OAUTH_TOKEN_FILE`
+- `GDRIVE_OAUTH_TOKEN_JSON`
+- `GDRIVE_INDEX_FILENAME`
 
-`POST /admin/reload-index` now does real incremental indexing:
+### Recommendation Runtime
 
-- finds active jobs where `indexed != true`
-- generates embeddings for those jobs
-- appends them to the existing FAISS index
-- uploads the updated index to Google Drive
-- marks those jobs as `indexed: true`
-- reloads the live in-memory index
+- `HF_CACHE_DIR`
 
-Relevant files:
+### External Import
 
-- [index_builder.py](d:/Clg Notes/MCA/4th Semester/job-rec-sys (production)/backend/app/services/index_builder.py:54)
-- [routes.py](d:/Clg Notes/MCA/4th Semester/job-rec-sys (production)/backend/app/api/routes.py:113)
+- `ENABLE_ARBEITNOW_IMPORT`
 
-## Google Drive
+### Optional Tooling Variable
 
-Drive is used for:
+- `GDRIVE_OAUTH_CLIENT_FILE`
 
-- uploaded resumes
-- stored FAISS index file
+Used by `tools/gdrive_auth.py` to generate the OAuth token file.
 
-Resume upload:
+## Local Setup
 
-- [drive_service.py](d:/Clg Notes/MCA/4th Semester/job-rec-sys (production)/backend/app/services/drive_service.py:97)
-
-Index upload/download:
-
-- [drive_service.py](d:/Clg Notes/MCA/4th Semester/job-rec-sys (production)/backend/app/services/drive_service.py:164)
-
-If your Drive OAuth token is expired or revoked, you may see:
-
-```text
-invalid_grant: Token has been expired or revoked.
+```powershell
+cd backend
+python -m venv venv
+venv\Scripts\activate
+pip install --upgrade pip
+pip install -r requirements.txt
+python -m spacy download en_core_web_sm
 ```
 
-Fix:
+If you prefer the bundled wheel, you can install the local spaCy model file from the `backend/` folder instead.
 
-- generate a fresh Google OAuth token
-- replace `app/keys/gdrive_token.json` or `GDRIVE_OAUTH_TOKEN_JSON`
-- restart the backend
+Create `app/.env` from `app/.env.example`, then run:
 
-## OTP Email Reset
+```powershell
+uvicorn app.main:app --reload
+```
 
-Forgot password uses email OTP.
+Or:
 
-Behavior:
+```powershell
+python run.py
+```
 
-- OTP is generated server-side
-- OTP is hashed before storing
-- OTP is emailed to user
-- OTP expires after configured minutes
+## Docker
 
-Relevant files:
+Build:
 
-- [auth_routes.py](d:/Clg Notes/MCA/4th Semester/job-rec-sys (production)/backend/app/api/auth_routes.py:191)
-- [email_service.py](d:/Clg Notes/MCA/4th Semester/job-rec-sys (production)/backend/app/services/email_service.py:1)
+```powershell
+cd backend
+docker build -t job-rec-backend .
+```
 
-## Database Collections
+Run:
 
-Main collections:
+```powershell
+docker run -p 8000:8000 --env-file app/.env job-rec-backend
+```
+
+## Data Storage
+
+### MongoDB Collections
 
 - `users`
 - `jobs`
@@ -375,56 +250,154 @@ Main collections:
 - `recommendation_sessions`
 - `recommendation_items`
 
-Index definitions are created in [database.py](d:/Clg Notes/MCA/4th Semester/job-rec-sys (production)/backend/app/core/database.py:1).
+Collection indexes are created in `app/core/database.py`.
+
+### Google Drive
+
+The backend uses Drive for:
+
+- uploaded resume files
+- the shared FAISS index file `jobs.index`
+
+Drive logic lives in `app/services/drive_service.py`.
+
+## Job Schema Notes
+
+The backend supports both:
+
+- normalized job fields used by manual creation through the app
+- legacy imported fields like `Job Title`, `Company Name`, and `Direct Link`
+
+Normalization and response shaping live in `app/api/jobs_routes.py`.
+
+## Recommendation Pipeline
+
+1. The API receives a resume file on `POST /recommend`.
+2. The file is saved temporarily and uploaded to Google Drive.
+3. Resume text is parsed using the file readers and spaCy skill matching.
+4. The recommender loads the FAISS index and active jobs.
+5. Jobs are scored and sorted.
+6. A recommendation session plus item snapshots are stored in MongoDB.
+
+Primary files:
+
+- `app/api/routes.py`
+- `app/services/resume_parser.py`
+- `app/services/skill_matcher.py`
+- `app/services/recommender.py`
+
+## Index Lifecycle
+
+### Startup
+
+On app startup:
+
+- the backend downloads the current `jobs.index` from Google Drive
+- the FAISS index is loaded into memory
+- active jobs are loaded from MongoDB
+- a background refresh loop starts
+
+Main file: `app/services/index_manager.py`
+
+### Admin Reload
+
+`POST /admin/reload-index`:
+
+- finds active jobs where `indexed != true`
+- embeds those jobs
+- appends them to the FAISS index
+- uploads the updated index to Google Drive
+- marks jobs as indexed
+- reloads the live in-memory index
+
+Main files:
+
+- `app/services/index_builder.py`
+- `app/api/routes.py`
+
+## External Job Import
+
+Provider currently supported:
+
+- Arbeitnow
+
+The backend can:
+
+- search external jobs without saving
+- import matching external jobs into MongoDB
+
+Imported jobs:
+
+- are stored as active jobs
+- are marked `indexed = false`
+- require index refresh before they participate in recommendations
+
+Main file: `app/services/external_jobs.py`
+
+## Tool Scripts
+
+### `tools/gdrive_auth.py`
+
+Creates a local Google OAuth token file for Drive access.
+
+### `tools/build_faiss_index.py`
+
+Builds a fresh FAISS index from all jobs and uploads it to Drive.
+
+### `tools/incremental_index_builder.py`
+
+Legacy/manual incremental index builder script. Useful as a maintenance helper outside the API path.
+
+### `tools/upload_new_jobs_to_mongodb.py`
+
+Imports `data/new_jobs.csv` into MongoDB.
+
+## Files Worth Reading First
+
+- `app/main.py`
+- `app/core/database.py`
+- `app/core/auth.py`
+- `app/api/auth_routes.py`
+- `app/api/jobs_routes.py`
+- `app/api/routes.py`
+- `app/services/recommender.py`
+- `app/services/index_manager.py`
+- `app/services/drive_service.py`
 
 ## Troubleshooting
 
-### `POST /recommend` returns 500
+### API starts but recommendations fail
 
 Check:
 
-- FAISS index exists
-- MongoDB is reachable
-- Google Drive credentials are valid
-- `en_core_web_sm` is installed
+- MongoDB connection
+- Google Drive credentials
+- `jobs.index` availability
+- spaCy model installation
 
-### `invalid_grant` on startup or upload
+### `invalid_grant` or Drive auth failures
 
-Cause:
-
-- Google Drive OAuth token expired or revoked
-
-Fix:
-
-- refresh the token
-- update env or token file
+Usually means the OAuth token is expired or revoked. Regenerate the token and update the configured token source.
 
 ### New jobs do not appear in recommendations
 
-Cause:
+Those jobs are probably still `indexed = false`. Trigger the admin reload-index flow.
 
-- jobs are still `indexed: false`
+### Password reset email is not sent
 
-Fix:
+Check all SMTP variables in `app/.env`.
 
-- use the admin reload-index action
+### 401 redirects in the frontend
 
-### SMTP errors during forgot password
+Usually means the JWT is missing, expired, or invalid relative to `SECRET_KEY`.
 
-Check:
+## Backend Summary For Handoff
 
-- `SMTP_HOST`
-- `SMTP_PORT`
-- `SMTP_USERNAME`
-- `SMTP_PASSWORD`
-- `SMTP_FROM_EMAIL`
+If a new developer or AI needs to understand the backend quickly, the shortest useful path is:
 
-### Local Windows permission issues for HF cache
-
-The recommender now supports `HF_CACHE_DIR`. If needed, set it explicitly in `.env`.
-
-## Notes
-
-- This backend currently uses open CORS in development.
-- Replace the default JWT secret before production use.
-- Python 3.11+ is recommended for longer-term dependency compatibility.
+1. `app/main.py`
+2. `app/api/jobs_routes.py`
+3. `app/api/routes.py`
+4. `app/api/auth_routes.py`
+5. `app/services/recommender.py`
+6. `app/services/index_manager.py`

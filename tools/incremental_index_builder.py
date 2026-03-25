@@ -16,7 +16,6 @@ dotenv.load_dotenv(ENV_PATH)
 # os.environ["HF_HOME"] = "/tmp/hf_cache"
 # os.environ["TRANSFORMERS_CACHE"] = "/tmp/hf_cache"
 
-import numpy as np
 import faiss
 from pymongo import MongoClient
 from app.services.recommender import get_model

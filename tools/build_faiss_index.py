@@ -15,7 +15,6 @@ ENV_PATH = os.path.join(PROJECT_ROOT, "app", ".env")
 dotenv.load_dotenv(ENV_PATH)
 
 # ---------------- Imports ----------------
-import numpy as np
 import faiss
 from pymongo import MongoClient
 from app.services.drive_service import upload_index_to_drive

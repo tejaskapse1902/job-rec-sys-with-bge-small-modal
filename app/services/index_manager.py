@@ -11,7 +11,6 @@ from app.services.drive_service import (
     get_drive_last_modified
 )
 
-dotenv.load_dotenv()
 # Load environment variables with fallback
 if not dotenv.load_dotenv():
     dotenv.load_dotenv("app/.env")
