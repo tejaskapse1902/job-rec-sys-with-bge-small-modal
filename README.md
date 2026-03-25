@@ -99,9 +99,7 @@ GDRIVE_OAUTH_TOKEN_JSON=
 
 HF_CACHE_DIR=
 
-ENABLE_JSEARCH_IMPORT=false
-RAPIDAPI_KEY=
-RAPIDAPI_HOST=jsearch.p.rapidapi.com
+ENABLE_ARBEITNOW_IMPORT=true
 ```
 
 Important config sources:
@@ -234,7 +232,8 @@ File:
 
 ### External Import
 
-- `POST /admin/jobs/import/jsearch`
+- `POST /admin/jobs/import/search`
+- `POST /admin/jobs/import`
 
 File:
 

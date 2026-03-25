@@ -9,7 +9,7 @@ from app.api.jobs_routes import router as jobs_router
 from app.api.user_routes import router as user_router
 from app.api.applications_routes import router as applications_router
 from app.api.recommendations_routes import router as recommendations_router
-from app.api.reports_routes import router as reports_router
+from app.api.reports_routes import router as reports_router, employer_router as employer_reports_router
 from app.api.external_jobs_routes import router as external_jobs_router
 from app.services.index_manager import initialize_index, start_auto_refresh
 
@@ -51,6 +51,7 @@ app.include_router(user_router)
 app.include_router(applications_router)
 app.include_router(recommendations_router)
 app.include_router(reports_router)
+app.include_router(employer_reports_router)
 app.include_router(external_jobs_router)
 
 @app.get("/health")

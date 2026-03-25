@@ -175,6 +175,21 @@ def delete_resume(file_id: str):
     service.files().delete(fileId=file_id).execute()
 
 
+def download_resume(file_id: str) -> tuple[bytes, dict]:
+    service = _drive()
+    metadata = service.files().get(fileId=file_id, fields="id,name,mimeType").execute()
+    request = service.files().get_media(fileId=file_id)
+
+    buffer = BytesIO()
+    downloader = MediaIoBaseDownload(buffer, request)
+
+    done = False
+    while not done:
+        _, done = downloader.next_chunk()
+
+    return buffer.getvalue(), metadata
+
+
 # ==================================================
 # FAISS INDEX
 # ==================================================

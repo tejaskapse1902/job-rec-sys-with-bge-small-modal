@@ -33,6 +33,12 @@ class JobBase(BaseModel):
     company_website: Optional[str] = None
     company_description: Optional[str] = None
     source: str = "manual"
+    external_provider: Optional[str] = None
+    source_label: Optional[str] = None
+    attribution_required: bool = False
+    attribution_text: Optional[str] = None
+    attribution_url: Optional[str] = None
+    publisher: Optional[str] = None
     external_id: Optional[str] = None
     job_link: Optional[str] = None
 
@@ -63,6 +69,12 @@ class JobUpdate(BaseModel):
     company_website: Optional[str] = None
     company_description: Optional[str] = None
     source: Optional[str] = None
+    external_provider: Optional[str] = None
+    source_label: Optional[str] = None
+    attribution_required: Optional[bool] = None
+    attribution_text: Optional[str] = None
+    attribution_url: Optional[str] = None
+    publisher: Optional[str] = None
     external_id: Optional[str] = None
     job_link: Optional[str] = None
     is_active: Optional[bool] = None
