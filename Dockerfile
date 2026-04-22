@@ -12,7 +12,7 @@ ENV TOKENIZERS_PARALLELISM=false
 # System dependencies
 # ------------------------
 RUN apt-get update && apt-get install -y \
-    gcc g++ curl \
+    gcc g++ curl libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 # ------------------------

@@ -1,8 +1,6 @@
 import os
 import time
 import threading
-import faiss
-import pandas as pd
 from pymongo import MongoClient
 from app.core.config import DATA_DIR
 import dotenv
@@ -43,10 +41,14 @@ def download_index():
 
 def load_index_from_disk():
     global _index
+    import faiss
+
     _index = faiss.read_index(LOCAL_INDEX)
 
 
 def load_jobs_from_mongodb():
+    import pandas as pd
+
     client = MongoClient(MONGO_URI)
     col = client[DB_NAME][COLLECTION]
     # Backfill missing active flags for legacy rows.
