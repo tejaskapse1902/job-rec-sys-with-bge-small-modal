@@ -17,7 +17,12 @@ from app.services.index_manager import get_index, get_jobs_df
 # -----------------------------
 # HuggingFace cache config
 # -----------------------------
-CACHE_DIR = os.getenv("HF_CACHE_DIR", os.path.join(DATA_DIR, "hf_cache"))
+def _resolve_cache_dir() -> str:
+    configured = (os.getenv("HF_CACHE_DIR") or "").strip()
+    return configured or os.path.join(DATA_DIR, "hf_cache")
+
+
+CACHE_DIR = _resolve_cache_dir()
 os.environ["HF_HOME"] = CACHE_DIR
 os.environ["TRANSFORMERS_CACHE"] = CACHE_DIR
 os.makedirs(CACHE_DIR, exist_ok=True)
