@@ -12,10 +12,7 @@ from app.core.database import (
     users_collection,
 )
 from app.services.drive_service import delete_resume, list_resumes, upload_to_drive
-from app.services.index_builder import incremental_index_new_jobs
 from app.services.index_manager import reload_index_and_jobs
-from app.services.recommender import recommend_jobs
-from app.services.resume_parser import parse_resume_file
 
 router = APIRouter()
 
@@ -29,6 +26,9 @@ async def recommend(
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user),
 ):
+    from app.services.resume_parser import parse_resume_file
+    from app.services.recommender import recommend_jobs
+
     suffix = os.path.splitext(file.filename)[1]
 
     data = await file.read()
@@ -112,6 +112,8 @@ def delete_resume_api(req: DeleteRequest, current_user: dict = Depends(get_curre
 
 @router.post("/admin/reload-index")
 def reload_index(current_admin: dict = Depends(get_current_admin)):
+    from app.services.index_builder import incremental_index_new_jobs
+
     _ = current_admin
     index_result = incremental_index_new_jobs()
     reload_index_and_jobs()

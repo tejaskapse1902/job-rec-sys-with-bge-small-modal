@@ -11,11 +11,17 @@ from app.api.applications_routes import router as applications_router
 from app.api.recommendations_routes import router as recommendations_router
 from app.api.reports_routes import router as reports_router, employer_router as employer_reports_router
 from app.api.external_jobs_routes import router as external_jobs_router
+from app.core.database import ensure_indexes
 from app.services.index_manager import initialize_index, start_auto_refresh
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    try:
+        ensure_indexes()
+    except Exception as e:
+        print(f"Database init failed: {e}")
+
     # ✅ Fast, non-blocking startup
     try:
         initialize_index()
