@@ -117,8 +117,8 @@ def check_and_reload():
 def start_auto_refresh(interval=300):
     def loop():
         while True:
-            check_and_reload()
             time.sleep(interval)
+            check_and_reload()
 
     t = threading.Thread(target=loop, daemon=True)
     t.start()

@@ -182,6 +182,8 @@ Use `backend/app/.env`. A template is available at [app/.env.example](app/.env.e
 ### Google Drive
 
 - `GDRIVE_AUTH_MODE`
+- `GDRIVE_SERVICE_ACCOUNT_JSON`
+- `GDRIVE_SERVICE_ACCOUNT_FILE`
 - `GDRIVE_OAUTH_TOKEN_FILE`
 - `GDRIVE_OAUTH_TOKEN_JSON`
 - `GDRIVE_INDEX_FILENAME`
@@ -199,6 +201,13 @@ Use `backend/app/.env`. A template is available at [app/.env.example](app/.env.e
 - `GDRIVE_OAUTH_CLIENT_FILE`
 
 Used by `tools/gdrive_auth.py` to generate the OAuth token file.
+
+Auth mode notes:
+
+- `GDRIVE_AUTH_MODE=auto` tries service-account credentials first, then OAuth
+- `GDRIVE_AUTH_MODE=service_account` is the recommended deployment mode
+- `GDRIVE_AUTH_MODE=oauth` is convenient for local development after running `tools/gdrive_auth.py`
+- files under `app/keys` are not committed to the repo, so production should use env-based secrets or a mounted secret file
 
 ## Local Setup
 
@@ -239,6 +248,8 @@ Run:
 ```powershell
 docker run -p 8000:8000 --env-file app/.env job-rec-backend
 ```
+
+For cloud deployments, prefer setting `GDRIVE_AUTH_MODE=service_account` and injecting `GDRIVE_SERVICE_ACCOUNT_JSON` as a secret. If you stay on OAuth, you must also inject `GDRIVE_OAUTH_TOKEN_JSON` or mount the token file into the container.
 
 ## Data Storage
 
@@ -377,7 +388,14 @@ Check:
 
 ### `invalid_grant` or Drive auth failures
 
-Usually means the OAuth token is expired or revoked. Regenerate the token and update the configured token source.
+Usually means the OAuth token is expired, revoked, or missing from the deployed container. Regenerate the token and update the configured token source.
+
+If startup says `OAuth token not found: /app/app/keys/gdrive_token.json`, the deployment is still using OAuth without a deployed token file. Fix it by either:
+
+- switching to `GDRIVE_AUTH_MODE=service_account` and setting `GDRIVE_SERVICE_ACCOUNT_JSON`
+- or keeping OAuth and setting `GDRIVE_OAUTH_TOKEN_JSON`
+
+If you use a service account, share both Google Drive folders referenced by `GDRIVE_RESUMES_FOLDER_ID` and `GDRIVE_INDEX_FOLDER_ID` with the service account email.
 
 ### New jobs do not appear in recommendations
 

@@ -13,6 +13,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 
 from google.auth.transport.requests import Request
+from google.oauth2 import service_account
 from google.oauth2.credentials import Credentials
 
 # Load .env (local/dev)
@@ -22,7 +23,6 @@ dotenv.load_dotenv("app/.env")
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 BASE_DIR = Path(__file__).resolve().parents[2]  # backend/
-AUTH_MODE = os.getenv("GDRIVE_AUTH_MODE", "oauth").lower()
 
 RESUMES_FOLDER_ID = os.getenv("GDRIVE_RESUMES_FOLDER_ID", "")
 INDEX_FOLDER_ID = os.getenv("GDRIVE_INDEX_FOLDER_ID", "")
@@ -38,6 +38,10 @@ def _guess_mime(name_or_path: str) -> str:
     return mt or "application/octet-stream"
 
 
+def _get_auth_mode() -> str:
+    return (os.getenv("GDRIVE_AUTH_MODE", "auto") or "auto").strip().lower()
+
+
 def _safe_delete(path: str, tries: int = 8, delay: float = 0.4):
     for _ in range(tries):
         try:
@@ -50,18 +54,28 @@ def _safe_delete(path: str, tries: int = 8, delay: float = 0.4):
         os.remove(path)
 
 
+def _load_json_env(env_name: str) -> dict | None:
+    raw = (os.getenv(env_name) or "").strip()
+    if not raw:
+        return None
+
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{env_name} is not valid JSON") from exc
+
+
 def _load_oauth_creds() -> Credentials:
     """
     Loads OAuth credentials from:
     1) env var GDRIVE_OAUTH_TOKEN_JSON (deployment)
     2) token file path GDRIVE_OAUTH_TOKEN_FILE (local)
     """
-    token_json = os.getenv("GDRIVE_OAUTH_TOKEN_JSON", "").strip()
+    info = _load_json_env("GDRIVE_OAUTH_TOKEN_JSON")
     token_file = os.getenv("GDRIVE_OAUTH_TOKEN_FILE", "app/keys/gdrive_token.json")
 
     # ✅ Deployment: token JSON in env
-    if token_json:
-        info = json.loads(token_json)
+    if info:
         creds = Credentials.from_authorized_user_info(info, SCOPES)
         if creds.expired and creds.refresh_token:
             creds.refresh(Request())
@@ -87,10 +101,66 @@ def _load_oauth_creds() -> Credentials:
     return creds
 
 
+def _load_service_account_creds():
+    """
+    Loads service-account credentials from:
+    1) env var GDRIVE_SERVICE_ACCOUNT_JSON (deployment)
+    2) file path GDRIVE_SERVICE_ACCOUNT_FILE (local/container mount)
+    """
+    service_account_file = os.getenv(
+        "GDRIVE_SERVICE_ACCOUNT_FILE",
+        "app/keys/gdrive_service_account.json",
+    )
+
+    info = _load_json_env("GDRIVE_SERVICE_ACCOUNT_JSON")
+    if info:
+        return service_account.Credentials.from_service_account_info(info, scopes=SCOPES)
+
+    service_account_path = Path(_abs_path(service_account_file))
+    if not service_account_path.exists():
+        raise FileNotFoundError(
+            f"Service-account JSON not found: {service_account_path}. "
+            f"Set GDRIVE_SERVICE_ACCOUNT_JSON or GDRIVE_SERVICE_ACCOUNT_FILE."
+        )
+
+    return service_account.Credentials.from_service_account_file(
+        str(service_account_path),
+        scopes=SCOPES,
+    )
+
+
+def _load_drive_creds():
+    auth_mode = _get_auth_mode()
+    if auth_mode == "oauth":
+        return _load_oauth_creds()
+
+    if auth_mode == "service_account":
+        return _load_service_account_creds()
+
+    if auth_mode == "auto":
+        errors = []
+        for label, loader in (
+            ("service_account", _load_service_account_creds),
+            ("oauth", _load_oauth_creds),
+        ):
+            try:
+                return loader()
+            except Exception as exc:
+                errors.append(f"{label}: {exc}")
+
+        raise RuntimeError(
+            "No usable Google Drive credentials found. "
+            "Set GDRIVE_AUTH_MODE to 'service_account' or 'oauth' and provide the matching credentials. "
+            + " | ".join(errors)
+        )
+
+    raise RuntimeError(
+        "Unsupported GDRIVE_AUTH_MODE. Use one of: auto, oauth, service_account."
+    )
+
+
 def _drive():
-    if AUTH_MODE != "oauth":
-        raise RuntimeError("This project is configured for OAuth. Set GDRIVE_AUTH_MODE=oauth.")
-    creds = _load_oauth_creds()
+    creds = _load_drive_creds()
     return build("drive", "v3", credentials=creds, cache_discovery=False)
 
 
