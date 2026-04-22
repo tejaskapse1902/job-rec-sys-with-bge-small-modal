@@ -51,4 +51,5 @@ EXPOSE 8000
 # ------------------------
 # Start server
 # ------------------------
-CMD [ "gunicorn", "app.main:app", "--workers", "1", "--worker-class", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--timeout", "120" ]
+# Railway injects PORT at runtime; default to 8000 for local containers.
+CMD ["sh", "-c", "gunicorn app.main:app --workers 1 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:${PORT:-8000} --timeout 120"]

@@ -251,6 +251,8 @@ docker run -p 8000:8000 --env-file app/.env job-rec-backend
 
 For cloud deployments, prefer setting `GDRIVE_AUTH_MODE=service_account` and injecting `GDRIVE_SERVICE_ACCOUNT_JSON` as a secret. If you stay on OAuth, you must also inject `GDRIVE_OAUTH_TOKEN_JSON` or mount the token file into the container.
 
+On Railway, the container must listen on the runtime `PORT` variable. The Dockerfile is configured to bind Gunicorn to `0.0.0.0:${PORT:-8000}` for this reason.
+
 ## Data Storage
 
 ### MongoDB Collections
@@ -385,6 +387,10 @@ Check:
 - Google Drive credentials
 - `jobs.index` availability
 - spaCy model installation
+
+### Railway returns 502 for `/health` or every API route
+
+This usually means the proxy cannot reach the app process. Check that the container is listening on Railway's injected `PORT` variable instead of a hardcoded port.
 
 ### `invalid_grant` or Drive auth failures
 
